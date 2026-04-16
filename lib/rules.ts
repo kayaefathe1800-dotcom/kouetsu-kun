@@ -121,7 +121,8 @@ export const buildProofreadPrompt = (
   article: string,
   keywords: string,
   charCount: string,
-  customRules?: string
+  customRules?: string,
+  partNote?: string
 ) => `${customRules
   ? `あなたはペイントホームズ加盟店の店舗サイトブログ専門の校閲者です。
 以下のルールに厳密に従い、提供されたブログ記事を校閲・修正してください。
@@ -136,7 +137,7 @@ ${charCount || '元の文字数前後'}
 【狙っているキーワード】
 ${keywords || '（指定なし）'}
 
-【確認してほしい記事】
+【確認してほしい記事】${partNote ? `\n※この記事は複数パートに分割されています${partNote}` : ''}
 ${article}
 
 ---
