@@ -1,9 +1,13 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import ProofreadResult, { type ProofreadData } from '@/components/ProofreadResult'
 import EmailModal from '@/components/EmailModal'
+import RulesEditor from '@/components/RulesEditor'
+import { DEFAULT_RULES } from '@/lib/rules'
 
 type InputMode = 'text' | 'url'
+
+const RULES_STORAGE_KEY = 'kouetsu_custom_rules'
 
 export default function Home() {
   const [mode, setMode] = useState<InputMode>('text')
@@ -17,6 +21,25 @@ export default function Home() {
   const [result, setResult] = useState<ProofreadData | null>(null)
   const [error, setError] = useState('')
   const [emailOpen, setEmailOpen] = useState(false)
+  const [rulesOpen, setRulesOpen] = useState(false)
+  const [customRules, setCustomRules] = useState<string>(DEFAULT_RULES)
+  const [rulesModified, setRulesModified] = useState(false)
+
+  // ローカルストレージからルールを読み込み
+  useEffect(() => {
+    const saved = localStorage.getItem(RULES_STORAGE_KEY)
+    if (saved) {
+      setCustomRules(saved)
+      setRulesModified(saved !== DEFAULT_RULES)
+    }
+  }, [])
+
+  const handleSaveRules = (rules: string) => {
+    setCustomRules(rules)
+    localStorage.setItem(RULES_STORAGE_KEY, rules)
+    setRulesModified(rules !== DEFAULT_RULES)
+    setRulesOpen(false)
+  }
 
   const fetchFromUrl = async () => {
     if (!articleUrl.trim()) return
@@ -51,7 +74,7 @@ export default function Home() {
     const res = await fetch('/api/proofread', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ article: text, keywords, charCount }),
+      body: JSON.stringify({ article: text, keywords, charCount, customRules }),
     })
 
     setLoading(false)
@@ -87,18 +110,33 @@ export default function Home() {
               ペイントホームズ専用
             </span>
           </div>
-          {result && (
+          <div className="flex items-center gap-2">
             <button
-              onClick={() => setEmailOpen(true)}
+              onClick={() => setRulesOpen(true)}
               className="btn-secondary text-sm"
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                  d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                  d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
               </svg>
-              メールで送信
+              校閲ルール編集
+              {rulesModified && (
+                <span className="w-2 h-2 bg-amber-400 rounded-full" title="カスタムルール適用中" />
+              )}
             </button>
-          )}
+            {result && (
+              <button
+                onClick={() => setEmailOpen(true)}
+                className="btn-secondary text-sm"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                    d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                </svg>
+                メールで送信
+              </button>
+            )}
+          </div>
         </div>
       </header>
 
@@ -269,6 +307,14 @@ export default function Home() {
           校閲くん — ペイントホームズ専用 AIブログ校閲ツール
         </p>
       </footer>
+
+      {/* ルール編集モーダル */}
+      <RulesEditor
+        isOpen={rulesOpen}
+        onClose={() => setRulesOpen(false)}
+        onSave={handleSaveRules}
+        currentRules={customRules}
+      />
 
       {/* メールモーダル */}
       {result && (

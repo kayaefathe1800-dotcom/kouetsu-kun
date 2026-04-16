@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { buildProofreadPrompt } from '@/lib/rules'
 
 export async function POST(req: NextRequest) {
-  const { article, keywords, charCount } = await req.json()
+  const { article, keywords, charCount, customRules } = await req.json()
 
   if (!article?.trim()) {
     return NextResponse.json({ error: '記事本文を入力してください' }, { status: 400 })
@@ -13,7 +13,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'GEMINI_API_KEY が設定されていません' }, { status: 500 })
   }
 
-  const prompt = buildProofreadPrompt(article, keywords ?? '', charCount ?? '')
+  const prompt = buildProofreadPrompt(article, keywords ?? '', charCount ?? '', customRules ?? undefined)
 
   const geminiRes = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
