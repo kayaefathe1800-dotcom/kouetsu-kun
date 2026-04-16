@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { Resend } from 'resend'
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const { Resend } = require('resend') as { Resend: new (key: string) => { emails: { send: (opts: unknown) => Promise<unknown> } } }
 
 export async function POST(req: NextRequest) {
   const { recipients, title, corrections, revisedArticle, titleSuggestions, finalCheck } =
