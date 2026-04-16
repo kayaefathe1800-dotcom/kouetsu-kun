@@ -17,32 +17,50 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: '有効なURLを入力してください' }, { status: 400 })
   }
 
-  // 最新記事を取得（URLがスラッグ付きの場合はslugで絞り込み）
-  const slug = url.split('/').filter(Boolean).pop()?.split('?')[0] ?? ''
+  // URLの末尾セグメントを取得（数字ならID、文字列ならスラッグ）
+  const lastSegment = url.split('/').filter(Boolean).pop()?.split('?')[0] ?? ''
+  const isNumericId = /^\d+$/.test(lastSegment)
 
-  let apiUrl = `${baseUrl}/wp-json/wp/v2/posts?per_page=1&status=publish`
-  if (slug && !slug.match(/^\d+$/)) {
-    apiUrl += `&slug=${encodeURIComponent(slug)}`
+  let post: Record<string, unknown> | null = null
+
+  // ① 数字IDの場合：/wp-json/wp/v2/posts/{id} で直接取得
+  if (isNumericId) {
+    const idUrl = `${baseUrl}/wp-json/wp/v2/posts/${lastSegment}`
+    const idRes = await fetch(idUrl, {
+      headers: { 'User-Agent': 'Mozilla/5.0' },
+      signal: AbortSignal.timeout(10000),
+    })
+    if (idRes.ok) {
+      post = await idRes.json()
+    }
   }
 
-  const res = await fetch(apiUrl, {
-    headers: { 'User-Agent': 'Mozilla/5.0' },
-    signal: AbortSignal.timeout(10000),
-  })
-
-  if (!res.ok) {
-    return NextResponse.json(
-      { error: 'WordPress REST APIにアクセスできませんでした。URLを確認してください。' },
-      { status: 400 }
-    )
+  // ② スラッグの場合（または①で取得できなかった場合）
+  if (!post) {
+    let apiUrl = `${baseUrl}/wp-json/wp/v2/posts?per_page=1&status=publish`
+    if (lastSegment && !isNumericId) {
+      apiUrl += `&slug=${encodeURIComponent(lastSegment)}`
+    }
+    const res = await fetch(apiUrl, {
+      headers: { 'User-Agent': 'Mozilla/5.0' },
+      signal: AbortSignal.timeout(10000),
+    })
+    if (!res.ok) {
+      return NextResponse.json(
+        { error: 'WordPress REST APIにアクセスできませんでした。URLを確認してください。' },
+        { status: 400 }
+      )
+    }
+    const posts = await res.json()
+    if (!Array.isArray(posts) || posts.length === 0) {
+      return NextResponse.json({ error: '記事が見つかりませんでした' }, { status: 404 })
+    }
+    post = posts[0]
   }
 
-  const posts = await res.json()
-  if (!Array.isArray(posts) || posts.length === 0) {
+  if (!post) {
     return NextResponse.json({ error: '記事が見つかりませんでした' }, { status: 404 })
   }
-
-  const post = posts[0]
   const title: string = post.title?.rendered?.replace(/&amp;/g, '&').replace(/<[^>]+>/g, '') ?? ''
   const content: string = stripHtml(post.content?.rendered ?? '')
 
