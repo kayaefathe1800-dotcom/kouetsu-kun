@@ -11,10 +11,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: '記事本文を入力してください' }, { status: 400 })
   }
 
-  const apiKey = process.env.GROQ_API_KEY
-  if (!apiKey) {
-    return NextResponse.json({ error: 'GROQ_API_KEY が設定されていません' }, { status: 500 })
+  // OpenAI優先、なければGroqにフォールバック
+  const openaiKey = process.env.OPENAI_API_KEY
+  const groqKey = process.env.GROQ_API_KEY
+  const useOpenAI = !!openaiKey
+
+  if (!openaiKey && !groqKey) {
+    return NextResponse.json({ error: 'OPENAI_API_KEY または GROQ_API_KEY が設定されていません' }, { status: 500 })
   }
+  const apiKey = (openaiKey || groqKey)!
 
   // 記事が長い場合は分割して校閲し、結果をマージ
   const chunks = splitArticle(article, MAX_ARTICLE_CHARS)
@@ -36,30 +41,36 @@ export async function POST(req: NextRequest) {
       chunks.length > 1 ? `（${i + 1}/${chunks.length}パート目）` : ''
     )
 
-    const groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    const endpoint = useOpenAI
+      ? 'https://api.openai.com/v1/chat/completions'
+      : 'https://api.groq.com/openai/v1/chat/completions'
+
+    const model = useOpenAI ? 'gpt-4o-mini' : 'llama-3.3-70b-versatile'
+
+    const aiRes = await fetch(endpoint, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: 'llama-3.3-70b-versatile',
+        model,
         messages: [{ role: 'user', content: prompt }],
         temperature: 0.1,
         max_tokens: 6000,
       }),
     })
 
-    if (!groqRes.ok) {
-      const err = await groqRes.text()
-      console.error('Groq API error:', groqRes.status, err)
-      let errMsg = `HTTPステータス: ${groqRes.status}`
+    if (!aiRes.ok) {
+      const err = await aiRes.text()
+      console.error('AI API error:', aiRes.status, err)
+      let errMsg = `HTTPステータス: ${aiRes.status}`
       try { errMsg = JSON.parse(err)?.error?.message ?? errMsg } catch { /* ignore */ }
       return NextResponse.json({ error: `AI校閲に失敗しました（${errMsg}）` }, { status: 502 })
     }
 
-    const groqJson = await groqRes.json()
-    const rawText: string = groqJson?.choices?.[0]?.message?.content ?? ''
+    const aiJson = await aiRes.json()
+    const rawText: string = aiJson?.choices?.[0]?.message?.content ?? ''
 
     const match = rawText.match(/\{[\s\S]*\}/)
     if (!match) continue
