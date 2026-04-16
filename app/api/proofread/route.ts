@@ -16,7 +16,7 @@ export async function POST(req: NextRequest) {
   const prompt = buildProofreadPrompt(article, keywords ?? '', charCount ?? '', customRules ?? undefined)
 
   const geminiRes = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-8b:generateContent?key=${apiKey}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-8b-latest:generateContent?key=${apiKey}`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
