@@ -16,7 +16,7 @@ export async function POST(req: NextRequest) {
   const prompt = buildProofreadPrompt(article, keywords ?? '', charCount ?? '', customRules ?? undefined)
 
   const geminiRes = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -29,8 +29,14 @@ export async function POST(req: NextRequest) {
 
   if (!geminiRes.ok) {
     const err = await geminiRes.text()
-    console.error('Gemini API error:', err)
-    return NextResponse.json({ error: 'AI校閲に失敗しました。しばらくしてから再試行してください。' }, { status: 502 })
+    console.error('Gemini API error status:', geminiRes.status)
+    console.error('Gemini API error body:', err)
+    const errJson = JSON.parse(err || '{}')
+    const errMsg = errJson?.error?.message ?? `HTTPステータス: ${geminiRes.status}`
+    return NextResponse.json(
+      { error: `AI校閲に失敗しました（${errMsg}）` },
+      { status: 502 }
+    )
   }
 
   const geminiJson = await geminiRes.json()
